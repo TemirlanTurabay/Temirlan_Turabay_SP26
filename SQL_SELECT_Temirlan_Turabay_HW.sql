@@ -392,9 +392,9 @@ most efficient option.
 */
 SELECT
     f.release_year,
-    COALESCE(COUNT(DISTINCT CASE WHEN c.name = 'Drama' THEN f.film_id END), 0) AS number_of_drama_movies,
-    COALESCE(COUNT(DISTINCT CASE WHEN c.name = 'Travel' THEN f.film_id END), 0) AS number_of_travel_movies,
-    COALESCE(COUNT(DISTINCT CASE WHEN c.name = 'Documentary' THEN f.film_id END), 0) AS number_of_documentary_movies
+    COALESCE(COUNT(DISTINCT CASE WHEN UPPER(c.name) = 'DRAMA' THEN f.film_id END), 0) AS number_of_drama_movies,
+    COALESCE(COUNT(DISTINCT CASE WHEN UPPER(c.name) = 'TRAVEL' THEN f.film_id END), 0) AS number_of_travel_movies,
+    COALESCE(COUNT(DISTINCT CASE WHEN UPPER(c.name) = 'DOCUMENTARY' THEN f.film_id END), 0) AS number_of_documentary_movies
 FROM public.film AS f
 LEFT JOIN public.film_category AS fc
     ON f.film_id = fc.film_id
@@ -430,7 +430,7 @@ SELECT
         INNER JOIN public.category AS c
             ON fc.category_id = c.category_id
         WHERE f.release_year = y.release_year
-          AND c.name = 'Drama'
+          AND UPPER(c.name) = 'DRAMA'
     ), 0) AS number_of_drama_movies,
     COALESCE((
         SELECT
@@ -441,7 +441,7 @@ SELECT
         INNER JOIN public.category AS c
             ON fc.category_id = c.category_id
         WHERE f.release_year = y.release_year
-          AND c.name = 'Travel'
+          AND UPPER(c.name) = 'TRAVEL'
     ), 0) AS number_of_travel_movies,
     COALESCE((
         SELECT
@@ -452,7 +452,7 @@ SELECT
         INNER JOIN public.category AS c
             ON fc.category_id = c.category_id
         WHERE f.release_year = y.release_year
-          AND c.name = 'Documentary'
+          AND UPPER(c.name) = 'DOCUMENTARY'
     ), 0) AS number_of_documentary_movies
 FROM (
     SELECT DISTINCT
@@ -489,7 +489,7 @@ drama_counts AS (
         ON f.film_id = fc.film_id
     INNER JOIN public.category AS c
         ON fc.category_id = c.category_id
-    WHERE c.name = 'Drama'
+    WHERE UPPER(c.name) = 'DRAMA'
     GROUP BY
         f.release_year
 ),
@@ -502,7 +502,7 @@ travel_counts AS (
         ON f.film_id = fc.film_id
     INNER JOIN public.category AS c
         ON fc.category_id = c.category_id
-    WHERE c.name = 'Travel'
+    WHERE UPPER(c.name) = 'TRAVEL'
     GROUP BY
         f.release_year
 ),
@@ -515,7 +515,7 @@ documentary_counts AS (
         ON f.film_id = fc.film_id
     INNER JOIN public.category AS c
         ON fc.category_id = c.category_id
-    WHERE c.name = 'Documentary'
+    WHERE UPPER(c.name) = 'DOCUMENTARY'
     GROUP BY
         f.release_year
 )
@@ -537,8 +537,7 @@ ORDER BY
 
 /*
 Task 2.1
-The HR department aims to reward top-performing employees in 2017 with bonuses to recognize 
-their contribution to stores revenue. Show which three employees generated the most revenue in 2017? 
+The HR department aims to reward top-performing employees in 2017 with bonuses to recognize their contribution to stores revenue. Show which three employees generated the most revenue in 2017? 
 
 Assumptions: 
 staff could work in several stores in a year, please indicate which store the staff worked in (the last one);
@@ -562,8 +561,7 @@ is easier to read and test.
 */
 SELECT
     s.staff_id,
-    s.first_name,
-    s.last_name,
+    s.first_name || ' ' || s.last_name AS staff_full_name,
     ls.store_id AS last_store_id,
     CASE
         WHEN a.address2 IS NOT NULL AND a.address2 <> ''
@@ -576,12 +574,8 @@ FROM (
         p.staff_id,
         SUM(p.amount) AS revenue_2017
     FROM public.payment AS p
-    INNER JOIN public.rental AS r
-        ON p.rental_id = r.rental_id
-    INNER JOIN public.inventory AS i
-        ON r.inventory_id = i.inventory_id
-    WHERE p.payment_date >= DATE '2017-01-01'
-      AND p.payment_date < DATE '2018-01-01'
+    WHERE p.payment_date >= TIMESTAMP '2017-01-01 00:00:00'
+      AND p.payment_date < TIMESTAMP '2018-01-01 00:00:00'
     GROUP BY
         p.staff_id
 ) AS rev
@@ -589,40 +583,25 @@ INNER JOIN public.staff AS s
     ON s.staff_id = rev.staff_id
 INNER JOIN (
     SELECT
-        p.staff_id,
-        i.store_id
-    FROM public.payment AS p
-    INNER JOIN (
+        ranked.staff_id,
+        ranked.store_id
+    FROM (
         SELECT
-            staff_id,
-            MAX(payment_date) AS last_payment_date
-        FROM public.payment
-        WHERE payment_date >= DATE '2017-01-01'
-          AND payment_date < DATE '2018-01-01'
-        GROUP BY
-            staff_id
-    ) AS lpd
-        ON p.staff_id = lpd.staff_id
-       AND p.payment_date = lpd.last_payment_date
-    INNER JOIN (
-        SELECT
-            staff_id,
-            payment_date,
-            MAX(payment_id) AS last_payment_id
-        FROM public.payment
-        WHERE payment_date >= DATE '2017-01-01'
-          AND payment_date < DATE '2018-01-01'
-        GROUP BY
-            staff_id,
-            payment_date
-    ) AS lpr
-        ON p.staff_id = lpr.staff_id
-       AND p.payment_date = lpr.payment_date
-       AND p.payment_id = lpr.last_payment_id
-    INNER JOIN public.rental AS r
-        ON p.rental_id = r.rental_id
-    INNER JOIN public.inventory AS i
-        ON r.inventory_id = i.inventory_id
+            p.staff_id,
+            i.store_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY p.staff_id
+                ORDER BY p.payment_date DESC, p.payment_id DESC
+            ) AS rn
+        FROM public.payment AS p
+        INNER JOIN public.rental AS r
+            ON p.rental_id = r.rental_id
+        INNER JOIN public.inventory AS i
+            ON r.inventory_id = i.inventory_id
+        WHERE p.payment_date >= TIMESTAMP '2017-01-01 00:00:00'
+          AND p.payment_date < TIMESTAMP '2018-01-01 00:00:00'
+    ) AS ranked
+    WHERE ranked.rn = 1
 ) AS ls
     ON s.staff_id = ls.staff_id
 INNER JOIN public.store AS st
@@ -633,6 +612,7 @@ ORDER BY
     rev.revenue_2017 DESC,
     s.staff_id
 LIMIT 3;
+
 
 /*
 Business logic:
@@ -653,8 +633,7 @@ I would not choose this version for production on a larger database.
 */
 SELECT
     s.staff_id,
-    s.first_name,
-    s.last_name,
+    s.first_name || ' ' || s.last_name AS staff_full_name,
     (
         SELECT
             i.store_id
@@ -745,14 +724,10 @@ WITH payments_2017 AS (
         p.staff_id,
         p.amount,
         p.payment_date,
-        i.store_id
+        p.rental_id
     FROM public.payment AS p
-    INNER JOIN public.rental AS r
-        ON p.rental_id = r.rental_id
-    INNER JOIN public.inventory AS i
-        ON r.inventory_id = i.inventory_id
-    WHERE p.payment_date >= DATE '2017-01-01'
-      AND p.payment_date < DATE '2018-01-01'
+    WHERE p.payment_date >= TIMESTAMP '2017-01-01 00:00:00'
+      AND p.payment_date < TIMESTAMP '2018-01-01 00:00:00'
 ),
 revenue_by_staff AS (
     SELECT
@@ -762,38 +737,30 @@ revenue_by_staff AS (
     GROUP BY
         staff_id
 ),
-last_payment_date AS (
-    SELECT
-        staff_id,
-        MAX(payment_date) AS last_payment_date
-    FROM payments_2017
-    GROUP BY
-        staff_id
-),
-last_payment_row AS (
+ranked_last_store AS (
     SELECT
         p.staff_id,
-        MAX(p.payment_id) AS last_payment_id
+        i.store_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY p.staff_id
+            ORDER BY p.payment_date DESC, p.payment_id DESC
+        ) AS rn
     FROM payments_2017 AS p
-    INNER JOIN last_payment_date AS lpd
-        ON p.staff_id = lpd.staff_id
-       AND p.payment_date = lpd.last_payment_date
-    GROUP BY
-        p.staff_id
+    INNER JOIN public.rental AS r
+        ON p.rental_id = r.rental_id
+    INNER JOIN public.inventory AS i
+        ON r.inventory_id = i.inventory_id
 ),
 last_store AS (
     SELECT
-        p.staff_id,
-        p.store_id
-    FROM payments_2017 AS p
-    INNER JOIN last_payment_row AS lpr
-        ON p.staff_id = lpr.staff_id
-       AND p.payment_id = lpr.last_payment_id
+        staff_id,
+        store_id
+    FROM ranked_last_store
+    WHERE rn = 1
 )
 SELECT
     s.staff_id,
-    s.first_name,
-    s.last_name,
+    s.first_name || ' ' || s.last_name AS staff_full_name,
     ls.store_id AS last_store_id,
     CASE
         WHEN a.address2 IS NOT NULL AND a.address2 <> ''
@@ -814,7 +781,6 @@ ORDER BY
     rbs.revenue_2017 DESC,
     s.staff_id
 LIMIT 3;
-
 
 /*
 Task 2.2

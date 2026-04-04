@@ -198,7 +198,10 @@ faster because it does not process every row separately.
 
 5c) DELETE does not free space immediately because it only marks rows 
 as deleted, and the physical space stays in the table until cleanup 
-happens. VACUUM FULL changes the table size because it rewrites 
+happens. Regular VACUUM can clean dead tuples and make their space 
+reusable for future inserts or updates, but it does not reduce the 
+physical file size of the table. Only VACUUM FULL rewrites the table 
+and shrinks the file on disk. VACUUM FULL changes the table size because it rewrites 
 the whole table and removes the unused space physically. 
 TRUNCATE behaves differently because it clears the whole table 
 directly without scanning and deleting rows one by one. 

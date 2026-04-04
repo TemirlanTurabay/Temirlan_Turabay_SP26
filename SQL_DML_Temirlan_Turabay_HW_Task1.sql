@@ -36,11 +36,11 @@ SELECT
     'R',
     CURRENT_DATE
 FROM public.language AS l
-WHERE l.name = 'English'
+WHERE LOWER(l.name) = LOWER('English')
   AND NOT EXISTS (
       SELECT 1
       FROM public.film AS f
-      WHERE f.title = 'The Wolf of Wall Street'
+      WHERE LOWER(f.title) = LOWER('The Wolf of Wall Street')
         AND f.release_year = 2013
   )
 RETURNING film_id, title, release_year, last_update;
@@ -76,11 +76,11 @@ SELECT
     'R',
     CURRENT_DATE
 FROM public.language AS l
-WHERE l.name = 'French'
+WHERE LOWER(l.name) = LOWER('French')
   AND NOT EXISTS (
       SELECT 1
       FROM public.film AS f
-      WHERE f.title = 'The Intouchables'
+      WHERE LOWER(f.title) = LOWER('The Intouchables')
         AND f.release_year = 2011
   )
 RETURNING film_id, title, release_year, last_update;
@@ -116,11 +116,11 @@ SELECT
     'PG-13',
     CURRENT_DATE
 FROM public.language AS l
-WHERE l.name = 'English'
+WHERE LOWER(l.name) = LOWER('English')
   AND NOT EXISTS (
       SELECT 1
       FROM public.film AS f
-      WHERE f.title = 'Interstellar'
+      WHERE LOWER(f.title) = LOWER('Interstellar')
         AND f.release_year = 2014
   )
 RETURNING film_id, title, release_year, last_update;
@@ -146,9 +146,9 @@ LEFT JOIN public.language AS l
     ON f.language_id = l.language_id
 LEFT JOIN public.language AS ol
     ON f.original_language_id = ol.language_id
-WHERE (f.title = 'The Wolf of Wall Street' AND f.release_year = 2013)
-   OR (f.title = 'The Intouchables' AND f.release_year = 2011)
-   OR (f.title = 'Interstellar' AND f.release_year = 2014)
+WHERE (LOWER(f.title) = LOWER('The Wolf of Wall Street') AND f.release_year = 2013)
+   OR (LOWER(f.title) = LOWER('The Intouchables') AND f.release_year = 2011)
+   OR (LOWER(f.title) = LOWER('Interstellar') AND f.release_year = 2014)
 ORDER BY f.title;
 
 /*to check duplicates*/
@@ -158,9 +158,9 @@ SELECT
     f.release_year,
     COUNT(*) AS record_count
 FROM public.film AS f
-WHERE (f.title = 'The Wolf of Wall Street' AND f.release_year = 2013)
-   OR (f.title = 'The Intouchables' AND f.release_year = 2011)
-   OR (f.title = 'Interstellar' AND f.release_year = 2014)
+WHERE (LOWER(f.title) = LOWER('The Wolf of Wall Street') AND f.release_year = 2013)
+   OR (LOWER(f.title) = LOWER('The Intouchables') AND f.release_year = 2011)
+   OR (LOWER(f.title) = LOWER('Interstellar') AND f.release_year = 2014)
 GROUP BY f.title, f.release_year
 ORDER BY f.title;
 
@@ -198,8 +198,8 @@ insert_actors AS (
     WHERE NOT EXISTS (
         SELECT *
         FROM public.actor a
-        WHERE a.first_name = s.first_name
-          AND a.last_name = s.last_name
+        WHERE LOWER(a.first_name) = LOWER(s.first_name)
+          AND LOWER(a.last_name) = LOWER(s.last_name)
     )
     RETURNING actor_id, first_name, last_name
 )
@@ -210,10 +210,10 @@ SELECT DISTINCT
     CURRENT_DATE
 FROM actor_seed s
 JOIN public.actor a
-    ON a.first_name = s.first_name
-   AND a.last_name = s.last_name
+    ON LOWER(a.first_name) = LOWER(s.first_name)
+   AND LOWER(a.last_name) = LOWER(s.last_name)
 JOIN public.film f
-    ON f.title = s.film_title
+    ON LOWER(f.title) = LOWER(s.film_title)
 WHERE NOT EXISTS (
     SELECT *
     FROM film_actor fa
@@ -273,17 +273,17 @@ JOIN public.actor AS a
     ON fa.actor_id = a.actor_id
 JOIN public.film AS f
     ON fa.film_id = f.film_id
-WHERE (f.title = 'The Wolf of Wall Street' AND (
+WHERE (LOWER(f.title) = LOWER('The Wolf of Wall Street') AND (
           (a.first_name = 'Leonardo' AND a.last_name = 'DiCaprio')
        OR (a.first_name = 'Jonah' AND a.last_name = 'Hill')
        OR (a.first_name = 'Margot' AND a.last_name = 'Robbie')
 ))
-   OR (f.title = 'The Intouchables' AND (
+   OR (LOWER(f.title) = LOWER('The Intouchables') AND (
           (a.first_name = 'Francois' AND a.last_name = 'Cluzet')
        OR (a.first_name = 'Omar' AND a.last_name = 'Sy')
        OR (a.first_name = 'Audrey' AND a.last_name = 'Fleurot')
 ))
-   OR (f.title = 'Interstellar' AND (
+   OR (LOWER(f.title) = LOWER('Interstellar') AND (
           (a.first_name = 'Matthew' AND a.last_name = 'McConaughey')
        OR (a.first_name = 'Anne' AND a.last_name = 'Hathaway')
        OR (a.first_name = 'Jessica' AND a.last_name = 'Chastain')
@@ -302,17 +302,17 @@ JOIN public.actor AS a
     ON fa.actor_id = a.actor_id
 JOIN public.film AS f
     ON fa.film_id = f.film_id
-WHERE (f.title = 'The Wolf of Wall Street' AND (
+WHERE (LOWER(f.title) = LOWER('The Wolf of Wall Street') AND (
           (a.first_name = 'Leonardo' AND a.last_name = 'DiCaprio')
        OR (a.first_name = 'Jonah' AND a.last_name = 'Hill')
        OR (a.first_name = 'Margot' AND a.last_name = 'Robbie')
 ))
-   OR (f.title = 'The Intouchables' AND (
+   OR (LOWER(f.title) = LOWER('The Intouchables') AND (
           (a.first_name = 'Francois' AND a.last_name = 'Cluzet')
        OR (a.first_name = 'Omar' AND a.last_name = 'Sy')
        OR (a.first_name = 'Audrey' AND a.last_name = 'Fleurot')
 ))
-   OR (f.title = 'Interstellar' AND (
+   OR (LOWER(f.title) = LOWER('Interstellar') AND (
           (a.first_name = 'Matthew' AND a.last_name = 'McConaughey')
        OR (a.first_name = 'Anne' AND a.last_name = 'Hathaway')
        OR (a.first_name = 'Jessica' AND a.last_name = 'Chastain')
@@ -326,18 +326,29 @@ Add your favorite movies to any store's inventory.
 
 BEGIN;
 
+WITH random_store AS (
+    SELECT store_id
+    FROM public.store
+    ORDER BY random()
+    LIMIT 1
+)
 INSERT INTO public.inventory (film_id, store_id, last_update)
 SELECT
     f.film_id,
-    1 AS store_id,
+    rs.store_id,
     CURRENT_DATE
 FROM public.film f
-WHERE (f.title IN ('The Wolf of Wall Street', 'The Intouchables', 'Interstellar'))
+CROSS JOIN random_store rs
+WHERE LOWER(f.title) IN (
+    LOWER('The Wolf of Wall Street'),
+    LOWER('The Intouchables'),
+    LOWER('Interstellar')
+)
 AND NOT EXISTS (
-    SELECT *
-    FROM inventory i
+    SELECT 1
+    FROM public.inventory i
     WHERE i.film_id = f.film_id
-      AND i.store_id = 1
+      AND i.store_id = rs.store_id
 );
 
 COMMIT;
@@ -466,7 +477,7 @@ BEGIN;
 WITH target_customer AS (
     SELECT customer_id
     FROM customer
-    WHERE email = 'temirlan.turabay@nu.edu.kz'
+    WHERE LOWER(email) = LOWER('temirlan.turabay@nu.edu.kz')
     LIMIT 1
 ),
 
@@ -474,32 +485,35 @@ favorite_candidates AS (
     SELECT *
     FROM (
         VALUES
-            (1, 'The Wolf of Wall Street', 1, 4.99::numeric(5,2), TIMESTAMPTZ '2017-06-10 10:00:00+00', TIMESTAMPTZ '2017-06-17 10:00:00+00', TIMESTAMPTZ '2017-06-10 10:05:00+00'),
-            (2, 'The Intouchables', 1, 9.99::numeric(5,2), TIMESTAMPTZ '2017-06-11 11:00:00+00', TIMESTAMPTZ '2017-06-25 11:00:00+00', TIMESTAMPTZ '2017-06-11 11:05:00+00'),
-            (3, 'Interstellar', 1,19.99::numeric(5,2), TIMESTAMPTZ '2017-06-12 12:00:00+00', TIMESTAMPTZ '2017-07-03 12:00:00+00', TIMESTAMPTZ '2017-06-12 12:05:00+00')
-    ) AS v(movie_no, title, priority, amount, rental_date, return_date, payment_date)
-),
+            (1, 'The Wolf of Wall Street', 1, TIMESTAMPTZ '2017-06-10 10:00:00+00', TIMESTAMPTZ '2017-06-17 10:00:00+00', TIMESTAMPTZ '2017-06-10 10:05:00+00'),
+            (2, 'The Intouchables', 1, TIMESTAMPTZ '2017-06-11 11:00:00+00', TIMESTAMPTZ '2017-06-25 11:00:00+00', TIMESTAMPTZ '2017-06-11 11:05:00+00'),
+            (3, 'Interstellar', 1, TIMESTAMPTZ '2017-06-12 12:00:00+00', TIMESTAMPTZ '2017-07-03 12:00:00+00', TIMESTAMPTZ '2017-06-12 12:05:00+00')
+    ) AS v(movie_no, title, priority, rental_date, return_date, payment_date)
+)
 
 picked_films AS (
     SELECT DISTINCT ON (fc.movie_no)
         fc.movie_no,
         f.film_id,
         fc.title,
-        fc.amount,
+        f.rental_rate,
+        f.rental_duration,
         fc.rental_date,
         fc.return_date,
         fc.payment_date
     FROM favorite_candidates fc
     JOIN film f
-      ON f.title = fc.title
+      ON LOWER(f.title) = LOWER(fc.title)
     ORDER BY fc.movie_no, fc.priority
 ),
 
 picked_inventory AS (
     SELECT
         pf.movie_no,
+        pf.film_id,
         pf.title,
-        pf.amount,
+        pf.rental_rate,
+        pf.rental_duration,
         pf.rental_date,
         pf.return_date,
         pf.payment_date,
@@ -514,8 +528,10 @@ picked_inventory AS (
 selected_inventory AS (
     SELECT
         movie_no,
+        film_id,
         title,
-        amount,
+        rental_rate,
+        rental_duration,
         rental_date,
         return_date,
         payment_date,
@@ -523,6 +539,31 @@ selected_inventory AS (
         store_id
     FROM picked_inventory
     WHERE rn = 1
+),
+
+calculated_payments AS (
+    SELECT
+        si.movie_no,
+        si.film_id,
+        si.title,
+        si.inventory_id,
+        si.store_id,
+        si.rental_date,
+        si.return_date,
+        si.payment_date,
+        si.rental_rate,
+        si.rental_duration,
+        CEIL(EXTRACT(EPOCH FROM (si.return_date - si.rental_date)) / 86400.0) AS actual_days,
+        CASE
+            WHEN CEIL(EXTRACT(EPOCH FROM (si.return_date - si.rental_date)) / 86400.0) <= si.rental_duration
+                THEN si.rental_rate
+            ELSE
+                si.rental_rate +
+                (
+                    CEIL(EXTRACT(EPOCH FROM (si.return_date - si.rental_date)) / 86400.0) - si.rental_duration
+                ) * si.rental_rate
+        END::numeric(5,2) AS amount
+    FROM selected_inventory si
 ),
 
 inserted_rentals AS (
@@ -535,24 +576,24 @@ inserted_rentals AS (
         last_update
     )
     SELECT
-        si.rental_date,
-        si.inventory_id,
+        cp.rental_date,
+        cp.inventory_id,
         tc.customer_id,
-        si.return_date,
+        cp.return_date,
         (
             SELECT MIN(s.staff_id)
             FROM public.staff s
-            WHERE s.store_id = si.store_id
+            WHERE s.store_id = cp.store_id
         ) AS staff_id,
         CURRENT_DATE
-    FROM selected_inventory si
+    FROM calculated_payments cp
     CROSS JOIN target_customer tc
     WHERE NOT EXISTS (
         SELECT 1
         FROM rental r
-        WHERE r.inventory_id = si.inventory_id
+        WHERE r.inventory_id = cp.inventory_id
           AND r.customer_id = tc.customer_id
-          AND r.rental_date = si.rental_date
+          AND r.rental_date = cp.rental_date
     )
     RETURNING rental_id, inventory_id, customer_id, staff_id
 )
@@ -568,11 +609,11 @@ SELECT
     ir.customer_id,
     ir.staff_id,
     ir.rental_id,
-    si.amount,
-    si.payment_date
+    cp.amount,
+    cp.payment_date
 FROM inserted_rentals ir
-JOIN selected_inventory si
-  ON si.inventory_id = ir.inventory_id;
+JOIN calculated_payments cp
+  ON cp.inventory_id = ir.inventory_id;
 
 COMMIT;
 
@@ -604,10 +645,10 @@ LEFT JOIN public.payment AS p
     ON p.rental_id = r.rental_id
    AND p.customer_id = r.customer_id
 WHERE c.email = 'temirlan.turabay@nu.edu.kz'
-  AND f.title IN (
-      'The Wolf of Wall Street',
-      'The Intouchables',
-      'Interstellar'
+  AND LOWER(f.title) IN (
+      LOWER('The Wolf of Wall Street'),
+      LOWER('The Intouchables'),
+      LOWER('Interstellar')
   )
 ORDER BY r.rental_date, f.title;
 
@@ -615,7 +656,7 @@ ORDER BY r.rental_date, f.title;
 explanations:
 For the actors part, the script uses a small seed list of real actor names and inserts only those actors who are not already in the actor table. After that, it connects actors to films through the film_actor table by joining actor names with the correct film title, so the many-to-many relationship between films and actors is created correctly. DISTINCT and NOT EXISTS help avoid duplicate actors and duplicate film-actor links.
 
-For inventory, the script adds the three favorite movies to store 1 only if that exact film_id and store_id pair does not already exist. This means the relationship is built correctly through the film’s primary key, and duplicate inventory rows for the same store are avoided.
+For inventory, the script adds the three favorite movies to random store only if that exact film_id and store_id pair does not already exist. This means the relationship is built correctly through the film’s primary key, and duplicate inventory rows for the same store are avoided.
 
 For the customer update, the script first finds a customer who already has at least 43 rentals and 43 payments, then updates only that one customer record. It uses an existing address_id from the address table instead of changing the address table itself, so the foreign key stays valid and no shared address records are accidentally modified.
 

@@ -1,0 +1,18 @@
+1. How can one restrict access to certain columns of a database table?
+
+Access to certain columns can be restricted by giving permission only to the needed columns, not to the whole table. In PostgreSQL this is done with GRANT SELECT (column1, column2) on specific columns. For example, in the dvd_rental database, a user can be allowed to see only customer_id, first_name, last_name, and store_id from the customer table. This is useful when an employee needs only basic customer information and should not see private data such as email or account status.
+
+
+2. What is the difference between user identification and user authentication?
+
+User identification means telling the system who is trying to log in. For example, when someone enters the username rentaluser, that is identification. Authentication means checking whether this user is really who they claim to be, usually by verifying a password or another login method. So, identification is the name of the user, and authentication is the proof.
+
+
+3. What are the recommended authentication protocols for PostgreSQL?
+
+The recommended password authentication method in PostgreSQL is SCRAM-SHA-256 because it is more secure than older methods like MD5. For remote connections, it is also recommended to use SSL/TLS so that data sent between the client and the server is encrypted. In larger organizations, methods like GSSAPI, SSPI, or client certificates can also be used. In the dvd_rental database, this means user accounts should use SCRAM-SHA-256, and remote access should be protected with SSL.
+
+
+4. What is proxy authentication in PostgreSQL and what is it for? Why does it make role-based access control easier to implement?
+
+Proxy authentication means that one trusted account connects to the database first, and then switches to another role using SET ROLE. Its purpose is to separate login from permissions. For example, an application can connect with one technical account and then switch to a role like client_mary_smith. This makes role-based access control easier because permissions are stored in roles, and the application only needs to switch to the correct role instead of managing many separate login accounts with direct privileges.

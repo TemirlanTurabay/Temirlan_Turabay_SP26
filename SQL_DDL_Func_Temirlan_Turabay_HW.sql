@@ -262,7 +262,7 @@ BEGIN
           ON l.language_id = f.language_id
         JOIN public.inventory i
           ON i.film_id = f.film_id
-        WHERE f.title ILIKE v_pattern
+        WHERE f.title LIKE v_pattern
           AND public.inventory_in_stock(i.inventory_id)
     ),
     picked AS (
@@ -284,9 +284,9 @@ BEGIN
           ON c.customer_id = lr.customer_id
         ORDER BY a.film_id, lr.rental_date DESC NULLS LAST, a.inventory_id
     ),
-    numbered AS (
+    final_rows AS (
         SELECT
-            row_number() OVER (ORDER BY p.title, p.film_id) AS row_num_val,
+            p.film_id,
             p.title::text AS film_title_val,
             p.language_name::text AS language_val,
             p.customer_name_val,
@@ -294,13 +294,18 @@ BEGIN
         FROM picked p
     )
     SELECT
-        n.row_num_val,
-        n.film_title_val,
-        n.language_val,
-        n.customer_name_val,
-        n.rental_date_val
-    FROM numbered n
-    ORDER BY n.row_num_val;
+        (
+            SELECT COUNT(*)
+            FROM final_rows f2
+            WHERE f2.film_title_val < f1.film_title_val
+               OR (f2.film_title_val = f1.film_title_val AND f2.film_id <= f1.film_id)
+        )::bigint AS row_num,
+        f1.film_title_val,
+        f1.language_val,
+        f1.customer_name_val,
+        f1.rental_date_val
+    FROM final_rows f1
+    ORDER BY row_num;
 
     IF NOT FOUND THEN
         RETURN QUERY
@@ -375,7 +380,9 @@ BEGIN
     LIMIT 1;
 
     IF v_language_id IS NULL THEN
-        RAISE EXCEPTION 'Language "%" does not exist in public.language.', btrim(p_language_name);
+        INSERT INTO public.language(name, last_update)
+        VALUES (btrim(p_language_name), current_timestamp)
+        RETURNING language_id INTO v_language_id;
     END IF;
 
     SELECT COALESCE(MAX(film_id), 0) + 1
@@ -482,10 +489,10 @@ If there is a tie, it is resolved by title and then by film_id, so the result st
 If a country has no data, the function still returns that country, but puts '-' in the film columns.
 
 Task 4.
-The function uses ILIKE for partial search. For example, 'love' becomes '%love%',
+The function uses LIKE for partial search. For example, 'love' becomes '%love%',
 so it finds titles that contain that word anywhere.
 
-The search is case-insensitive. On large data, pattern search and stock checking can be slow,
+The search is case sensitive. On large data, pattern search and stock checking can be slow,
 so the query first filters matching films in stock and only then gets extra details.
 
 If several movies match, all of them are returned with row numbers.
@@ -497,6 +504,29 @@ The function creates a new film_id using MAX(film_id) + 1.
 Before insert, it checks whether the same movie title already exists.
 If it exists, the function raises an error and stops.
 
-It also checks whether the language exists in the language table.
+It first checks whether the language exists, if not, it inserts the new language into public.language and uses its generated language_id.
 If insert fails for any reason, PostgreSQL cancels the statement, so the database stays consistent.
 */
+
+/*
+Test calls
+*/
+
+/*Task 2*/
+SELECT * FROM core.get_sales_revenue_by_category_qtr('2005-Q2');
+
+/*Task 3*/
+SELECT * 
+FROM core.most_popular_films_by_countries(ARRAY['Afghanistan','Brazil','United States']);
+
+/*Task 4*/
+SELECT * 
+FROM core.films_in_stock_by_title('%LOVE%');
+
+SELECT * 
+FROM core.films_in_stock_by_title('%love%');
+
+/*Task 5*/
+SELECT core.new_movie('My Test Movie 1');
+SELECT core.new_movie('My Test Movie 2', 2024, 'Klingon');
+SELECT core.new_movie('My Test Movie 3', 2023, 'NewLanguageForTest');

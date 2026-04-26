@@ -1,0 +1,560 @@
+2. Basic environment information
+
+Query 2.1. Current database and current user
+SQL:
+SELECT current_database() AS db_name,
+       current_user      AS current_user,
+       session_user      AS session_user;
+
+Output:
+dvdrental	postgres	postgres
+
+3. Existing users, roles, and memberships
+
+Query 3.1. List all roles and core attributes
+SQL:
+SELECT rolname,
+       rolsuper,
+       rolinherit,
+       rolcreaterole,
+       rolcreatedb,
+       rolcanlogin,
+       rolreplication,
+       rolbypassrls,
+       rolconnlimit,
+       rolvaliduntil
+FROM pg_roles
+ORDER BY rolname;
+
+Output:
+pg_checkpoint	false	true	false	false	false	false	false	-1	
+pg_create_subscription	false	true	false	false	false	false	false	-1	
+pg_database_owner	false	true	false	false	false	false	false	-1	
+pg_execute_server_program	false	true	false	false	false	false	false	-1	
+pg_maintain	false	true	false	false	false	false	false	-1	
+pg_monitor	false	true	false	false	false	false	false	-1	
+pg_read_all_data	false	true	false	false	false	false	false	-1	
+pg_read_all_settings	false	true	false	false	false	false	false	-1	
+pg_read_all_stats	false	true	false	false	false	false	false	-1	
+pg_read_server_files	false	true	false	false	false	false	false	-1	
+pg_signal_autovacuum_worker	false	true	false	false	false	false	false	-1	
+pg_signal_backend	false	true	false	false	false	false	false	-1	
+pg_stat_scan_tables	false	true	false	false	false	false	false	-1	
+pg_use_reserved_connections	false	true	false	false	false	false	false	-1	
+pg_write_all_data	false	true	false	false	false	false	false	-1	
+pg_write_server_files	false	true	false	false	false	false	false	-1	
+postgres	true	true	true	true	true	true	true	-1	
+
+Interpretation:
+- rolcanlogin = true means the role can be used as a login account
+- rolsuper = true means full administrative access
+- rolbypassrls = true means the role can ignore row-level security
+- rolconnlimit shows the connection limit (-1 means unlimited)
+
+Query 3.2. Role memberships
+SQL:
+SELECT member.rolname   AS member_role,
+       parent.rolname   AS granted_role,
+       am.admin_option
+FROM pg_auth_members am
+JOIN pg_roles parent ON parent.oid = am.roleid
+JOIN pg_roles member ON member.oid = am.member
+ORDER BY member.rolname, parent.rolname;
+
+Output:
+pg_monitor	pg_read_all_settings	false
+pg_monitor	pg_read_all_stats	false
+pg_monitor	pg_stat_scan_tables	false
+
+4. Table-level privileges
+
+Query 4.1. Table privileges in the public schema
+SQL:
+SELECT grantee,
+       table_schema,
+       table_name,
+       privilege_type
+FROM information_schema.role_table_grants
+WHERE table_schema = 'public'
+ORDER BY table_name, grantee, privilege_type;
+
+Output:
+postgres	public	actor	DELETE
+postgres	public	actor	INSERT
+postgres	public	actor	REFERENCES
+postgres	public	actor	SELECT
+postgres	public	actor	TRIGGER
+postgres	public	actor	TRUNCATE
+postgres	public	actor	UPDATE
+postgres	public	actor_info	DELETE
+postgres	public	actor_info	INSERT
+postgres	public	actor_info	REFERENCES
+postgres	public	actor_info	SELECT
+postgres	public	actor_info	TRIGGER
+postgres	public	actor_info	TRUNCATE
+postgres	public	actor_info	UPDATE
+postgres	public	address	DELETE
+postgres	public	address	INSERT
+postgres	public	address	REFERENCES
+postgres	public	address	SELECT
+postgres	public	address	TRIGGER
+postgres	public	address	TRUNCATE
+postgres	public	address	UPDATE
+postgres	public	category	DELETE
+postgres	public	category	INSERT
+postgres	public	category	REFERENCES
+postgres	public	category	SELECT
+postgres	public	category	TRIGGER
+postgres	public	category	TRUNCATE
+postgres	public	category	UPDATE
+postgres	public	city	DELETE
+postgres	public	city	INSERT
+postgres	public	city	REFERENCES
+postgres	public	city	SELECT
+postgres	public	city	TRIGGER
+postgres	public	city	TRUNCATE
+postgres	public	city	UPDATE
+postgres	public	comments	DELETE
+postgres	public	comments	INSERT
+postgres	public	comments	REFERENCES
+postgres	public	comments	SELECT
+postgres	public	comments	TRIGGER
+postgres	public	comments	TRUNCATE
+postgres	public	comments	UPDATE
+postgres	public	country	DELETE
+postgres	public	country	INSERT
+postgres	public	country	REFERENCES
+postgres	public	country	SELECT
+postgres	public	country	TRIGGER
+postgres	public	country	TRUNCATE
+postgres	public	country	UPDATE
+postgres	public	customer	DELETE
+postgres	public	customer	INSERT
+postgres	public	customer	REFERENCES
+postgres	public	customer	SELECT
+postgres	public	customer	TRIGGER
+postgres	public	customer	TRUNCATE
+postgres	public	customer	UPDATE
+postgres	public	customer_list	DELETE
+postgres	public	customer_list	INSERT
+postgres	public	customer_list	REFERENCES
+postgres	public	customer_list	SELECT
+postgres	public	customer_list	TRIGGER
+postgres	public	customer_list	TRUNCATE
+postgres	public	customer_list	UPDATE
+postgres	public	film	DELETE
+postgres	public	film	INSERT
+postgres	public	film	REFERENCES
+postgres	public	film	SELECT
+postgres	public	film	TRIGGER
+postgres	public	film	TRUNCATE
+postgres	public	film	UPDATE
+postgres	public	film_actor	DELETE
+postgres	public	film_actor	INSERT
+postgres	public	film_actor	REFERENCES
+postgres	public	film_actor	SELECT
+postgres	public	film_actor	TRIGGER
+postgres	public	film_actor	TRUNCATE
+postgres	public	film_actor	UPDATE
+postgres	public	film_category	DELETE
+postgres	public	film_category	INSERT
+postgres	public	film_category	REFERENCES
+postgres	public	film_category	SELECT
+postgres	public	film_category	TRIGGER
+postgres	public	film_category	TRUNCATE
+postgres	public	film_category	UPDATE
+postgres	public	film_list	DELETE
+postgres	public	film_list	INSERT
+postgres	public	film_list	REFERENCES
+postgres	public	film_list	SELECT
+postgres	public	film_list	TRIGGER
+postgres	public	film_list	TRUNCATE
+postgres	public	film_list	UPDATE
+postgres	public	follows	DELETE
+postgres	public	follows	INSERT
+postgres	public	follows	REFERENCES
+postgres	public	follows	SELECT
+postgres	public	follows	TRIGGER
+postgres	public	follows	TRUNCATE
+postgres	public	follows	UPDATE
+postgres	public	hashtags	DELETE
+postgres	public	hashtags	INSERT
+postgres	public	hashtags	REFERENCES
+postgres	public	hashtags	SELECT
+postgres	public	hashtags	TRIGGER
+postgres	public	hashtags	TRUNCATE
+postgres	public	hashtags	UPDATE
+postgres	public	inventory	DELETE
+postgres	public	inventory	INSERT
+postgres	public	inventory	REFERENCES
+postgres	public	inventory	SELECT
+postgres	public	inventory	TRIGGER
+postgres	public	inventory	TRUNCATE
+postgres	public	inventory	UPDATE
+postgres	public	language	DELETE
+postgres	public	language	INSERT
+postgres	public	language	REFERENCES
+postgres	public	language	SELECT
+postgres	public	language	TRIGGER
+postgres	public	language	TRUNCATE
+postgres	public	language	UPDATE
+postgres	public	likes	DELETE
+postgres	public	likes	INSERT
+postgres	public	likes	REFERENCES
+postgres	public	likes	SELECT
+postgres	public	likes	TRIGGER
+postgres	public	likes	TRUNCATE
+postgres	public	likes	UPDATE
+postgres	public	nicer_but_slower_film_list	DELETE
+postgres	public	nicer_but_slower_film_list	INSERT
+postgres	public	nicer_but_slower_film_list	REFERENCES
+postgres	public	nicer_but_slower_film_list	SELECT
+postgres	public	nicer_but_slower_film_list	TRIGGER
+postgres	public	nicer_but_slower_film_list	TRUNCATE
+postgres	public	nicer_but_slower_film_list	UPDATE
+postgres	public	payment	DELETE
+postgres	public	payment	INSERT
+postgres	public	payment	REFERENCES
+postgres	public	payment	SELECT
+postgres	public	payment	TRIGGER
+postgres	public	payment	TRUNCATE
+postgres	public	payment	UPDATE
+postgres	public	payment_p2017_01	DELETE
+postgres	public	payment_p2017_01	INSERT
+postgres	public	payment_p2017_01	REFERENCES
+postgres	public	payment_p2017_01	SELECT
+postgres	public	payment_p2017_01	TRIGGER
+postgres	public	payment_p2017_01	TRUNCATE
+postgres	public	payment_p2017_01	UPDATE
+postgres	public	payment_p2017_02	DELETE
+postgres	public	payment_p2017_02	INSERT
+postgres	public	payment_p2017_02	REFERENCES
+postgres	public	payment_p2017_02	SELECT
+postgres	public	payment_p2017_02	TRIGGER
+postgres	public	payment_p2017_02	TRUNCATE
+postgres	public	payment_p2017_02	UPDATE
+postgres	public	payment_p2017_03	DELETE
+postgres	public	payment_p2017_03	INSERT
+postgres	public	payment_p2017_03	REFERENCES
+postgres	public	payment_p2017_03	SELECT
+postgres	public	payment_p2017_03	TRIGGER
+postgres	public	payment_p2017_03	TRUNCATE
+postgres	public	payment_p2017_03	UPDATE
+postgres	public	payment_p2017_04	DELETE
+postgres	public	payment_p2017_04	INSERT
+postgres	public	payment_p2017_04	REFERENCES
+postgres	public	payment_p2017_04	SELECT
+postgres	public	payment_p2017_04	TRIGGER
+postgres	public	payment_p2017_04	TRUNCATE
+postgres	public	payment_p2017_04	UPDATE
+postgres	public	payment_p2017_05	DELETE
+postgres	public	payment_p2017_05	INSERT
+postgres	public	payment_p2017_05	REFERENCES
+postgres	public	payment_p2017_05	SELECT
+postgres	public	payment_p2017_05	TRIGGER
+postgres	public	payment_p2017_05	TRUNCATE
+postgres	public	payment_p2017_05	UPDATE
+postgres	public	payment_p2017_06	DELETE
+postgres	public	payment_p2017_06	INSERT
+postgres	public	payment_p2017_06	REFERENCES
+postgres	public	payment_p2017_06	SELECT
+postgres	public	payment_p2017_06	TRIGGER
+postgres	public	payment_p2017_06	TRUNCATE
+postgres	public	payment_p2017_06	UPDATE
+postgres	public	post_hashtags	DELETE
+postgres	public	post_hashtags	INSERT
+postgres	public	post_hashtags	REFERENCES
+postgres	public	post_hashtags	SELECT
+postgres	public	post_hashtags	TRIGGER
+postgres	public	post_hashtags	TRUNCATE
+postgres	public	post_hashtags	UPDATE
+postgres	public	post_medias	DELETE
+postgres	public	post_medias	INSERT
+postgres	public	post_medias	REFERENCES
+postgres	public	post_medias	SELECT
+postgres	public	post_medias	TRIGGER
+postgres	public	post_medias	TRUNCATE
+postgres	public	post_medias	UPDATE
+postgres	public	posts	DELETE
+postgres	public	posts	INSERT
+postgres	public	posts	REFERENCES
+postgres	public	posts	SELECT
+postgres	public	posts	TRIGGER
+postgres	public	posts	TRUNCATE
+postgres	public	posts	UPDATE
+postgres	public	privacy_setting	DELETE
+postgres	public	privacy_setting	INSERT
+postgres	public	privacy_setting	REFERENCES
+postgres	public	privacy_setting	SELECT
+postgres	public	privacy_setting	TRIGGER
+postgres	public	privacy_setting	TRUNCATE
+postgres	public	privacy_setting	UPDATE
+postgres	public	privacy_setting_history	DELETE
+postgres	public	privacy_setting_history	INSERT
+postgres	public	privacy_setting_history	REFERENCES
+postgres	public	privacy_setting_history	SELECT
+postgres	public	privacy_setting_history	TRIGGER
+postgres	public	privacy_setting_history	TRUNCATE
+postgres	public	privacy_setting_history	UPDATE
+postgres	public	rental	DELETE
+postgres	public	rental	INSERT
+postgres	public	rental	REFERENCES
+postgres	public	rental	SELECT
+postgres	public	rental	TRIGGER
+postgres	public	rental	TRUNCATE
+postgres	public	rental	UPDATE
+postgres	public	sales_by_film_category	DELETE
+postgres	public	sales_by_film_category	INSERT
+postgres	public	sales_by_film_category	REFERENCES
+postgres	public	sales_by_film_category	SELECT
+postgres	public	sales_by_film_category	TRIGGER
+postgres	public	sales_by_film_category	TRUNCATE
+postgres	public	sales_by_film_category	UPDATE
+postgres	public	sales_by_store	DELETE
+postgres	public	sales_by_store	INSERT
+postgres	public	sales_by_store	REFERENCES
+postgres	public	sales_by_store	SELECT
+postgres	public	sales_by_store	TRIGGER
+postgres	public	sales_by_store	TRUNCATE
+postgres	public	sales_by_store	UPDATE
+postgres	public	shares	DELETE
+postgres	public	shares	INSERT
+postgres	public	shares	REFERENCES
+postgres	public	shares	SELECT
+postgres	public	shares	TRIGGER
+postgres	public	shares	TRUNCATE
+postgres	public	shares	UPDATE
+postgres	public	staff	DELETE
+postgres	public	staff	INSERT
+postgres	public	staff	REFERENCES
+postgres	public	staff	SELECT
+postgres	public	staff	TRIGGER
+postgres	public	staff	TRUNCATE
+postgres	public	staff	UPDATE
+postgres	public	staff_list	DELETE
+postgres	public	staff_list	INSERT
+postgres	public	staff_list	REFERENCES
+postgres	public	staff_list	SELECT
+postgres	public	staff_list	TRIGGER
+postgres	public	staff_list	TRUNCATE
+postgres	public	staff_list	UPDATE
+postgres	public	store	DELETE
+postgres	public	store	INSERT
+postgres	public	store	REFERENCES
+postgres	public	store	SELECT
+postgres	public	store	TRIGGER
+postgres	public	store	TRUNCATE
+postgres	public	store	UPDATE
+postgres	public	table_to_delete	DELETE
+postgres	public	table_to_delete	INSERT
+postgres	public	table_to_delete	REFERENCES
+postgres	public	table_to_delete	SELECT
+postgres	public	table_to_delete	TRIGGER
+postgres	public	table_to_delete	TRUNCATE
+postgres	public	table_to_delete	UPDATE
+postgres	public	user_profile_history	DELETE
+postgres	public	user_profile_history	INSERT
+postgres	public	user_profile_history	REFERENCES
+postgres	public	user_profile_history	SELECT
+postgres	public	user_profile_history	TRIGGER
+postgres	public	user_profile_history	TRUNCATE
+postgres	public	user_profile_history	UPDATE
+postgres	public	users	DELETE
+postgres	public	users	INSERT
+postgres	public	users	REFERENCES
+postgres	public	users	SELECT
+postgres	public	users	TRIGGER
+postgres	public	users	TRUNCATE
+postgres	public	users	UPDATE
+
+This shows who can SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, or TRIGGER on each table.
+
+Query 4.2. Schema privileges on schema public
+SQL:
+SELECT r.rolname AS grantee,
+       has_schema_privilege(r.rolname, 'public', 'USAGE')  AS has_usage,
+       has_schema_privilege(r.rolname, 'public', 'CREATE') AS has_create
+FROM pg_roles r
+ORDER BY r.rolname;
+
+Output:
+pg_checkpoint	true	false
+pg_create_subscription	true	false
+pg_database_owner	true	true
+pg_execute_server_program	true	false
+pg_maintain	true	false
+pg_monitor	true	false
+pg_read_all_data	true	false
+pg_read_all_settings	true	false
+pg_read_all_stats	true	false
+pg_read_server_files	true	false
+pg_signal_autovacuum_worker	true	false
+pg_signal_backend	true	false
+pg_stat_scan_tables	true	false
+pg_use_reserved_connections	true	false
+pg_write_all_data	true	false
+pg_write_server_files	true	false
+postgres	true	true
+
+USAGE on schema public is required to access objects in it.
+CREATE on schema public is sensitive because it lets ordinary roles create objects in the shared schema.
+
+Query 4.3. Database privileges
+SQL:
+SELECT datname,
+       datacl
+FROM pg_database
+WHERE datname = current_database();
+
+Output:
+dvdrental	NULL
+
+
+5. Row-level security
+
+Query 5.1. Tables with RLS enabled or forced
+SQL:
+SELECT n.nspname AS schemaname,
+       c.relname AS tablename,
+       c.relrowsecurity AS rowsecurity,
+       c.relforcerowsecurity AS forcerowsecurity
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = 'public'
+  AND c.relkind = 'r'
+ORDER BY c.relname;
+
+Output:
+public	actor	false	false
+public	address	false	false
+public	category	false	false
+public	city	false	false
+public	comments	false	false
+public	country	false	false
+public	customer	false	false
+public	film	false	false
+public	film_actor	false	false
+public	film_category	false	false
+public	follows	false	false
+public	hashtags	false	false
+public	inventory	false	false
+public	language	false	false
+public	likes	false	false
+public	payment_p2017_01	false	false
+public	payment_p2017_02	false	false
+public	payment_p2017_03	false	false
+public	payment_p2017_04	false	false
+public	payment_p2017_05	false	false
+public	payment_p2017_06	false	false
+public	post_hashtags	false	false
+public	post_medias	false	false
+public	posts	false	false
+public	privacy_setting	false	false
+public	privacy_setting_history	false	false
+public	rental	false	false
+public	shares	false	false
+public	staff	false	false
+public	store	false	false
+public	table_to_delete	false	false
+public	user_profile_history	false	false
+public	users	false	false
+
+- rowsecurity = true means RLS is enabled for the table
+- forcerowsecurity = true means even the table owner must obey RLS
+
+Query 5.2. Existing RLS policies
+SQL:
+SELECT schemaname,
+       tablename,
+       policyname,
+       permissive,
+       roles,
+       cmd,
+       qual,
+       with_check
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
+
+Output:
+There are no RLS policies configured in the public schema.
+
+
+6. Authentication-related and connection-related settings
+
+Query 6.1. Password encryption setting
+SQL:
+SHOW password_encryption;
+
+Output:
+scram-sha-256
+
+For modern PostgreSQL, scram-sha-256 is the preferred password storage method.
+
+
+Query 6.2. SSL setting
+SQL:
+SHOW ssl;
+
+Output:
+off
+
+The server cant accept encrypted connections.
+
+
+Query 6.3. Connection limit for the current database
+SQL:
+SELECT datname, datconnlimit
+FROM pg_database
+WHERE datname = current_database();
+
+Output:
+dvdrental	-1
+
+datconnlimit = -1 means no limit
+
+
+Query 6.4. Listen addresses
+SQL:
+SHOW listen_addresses;
+
+Output:
+*
+
+Means the server may accept network connections from all interfaces, depending on firewall rules.
+
+
+7. How to evaluate whether the current setup is sufficient or risky
+
+The current setup has some good security features. The database uses scram-sha-256 for password encryption, which is a modern and safer method. Also, most system roles do not have login access, and there are no extra custom users with broad privileges shown in the output.
+
+At the same time, there are several risks. The database is being used through the postgres superuser, which has full access and can bypass all restrictions. In addition, row-level security is not enabled on any table, and there are no RLS policies in the public schema. The server also has ssl = off, listen_addresses = '*', and the database connection limit is unlimited, which can make access less secure if the server is exposed to a network.
+
+Overall, the protection is only partially sufficient. Basic privilege management exists, but important protections for customer data are still missing.
+
+
+8. Example of at least one vulnerability and an improvement
+
+One important vulnerability is the absence of row-level security on customer-related tables such as rental and payment. Because of this, if a user gets SELECT permission on these tables, that user could see records of all customers, not just their own.
+
+This is a privacy and confidentiality risk because rental history and payment history are personal data. A good improvement is to enable row-level security on these tables and create policies so each customer role can view only its own rows.
+
+Another weakness is that SSL is turned off, while the server listens on all interfaces. This means data may travel without encryption if remote connections are allowed. A better solution is to enable SSL and restrict network access only to trusted hosts.
+
+
+9. Ready-to-use conclusion text
+
+Based on the audit, the dvdrental database already uses PostgreSQL roles, privileges, and secure password encryption. These settings provide basic protection at the object level.
+
+However, the configuration is not fully sufficient because customer data is not protected by row-level security. The main problem is that the database relies too much on broad administrative access and does not limit users to only their own records.
+
+To improve security, it is recommended to enable row-level security on rental and payment, avoid using the postgres superuser for normal work, and enable SSL for safer connections.
+
+
+10. Short final summary example
+
+The database already has basic security mechanisms such as roles, privileges, and SCRAM-SHA-256 password encryption. But this is not enough for full protection because row-level security is missing, SSL is disabled, and the server can listen on all network interfaces.
+
+A practical improvement is to enable RLS for customer tables, use separate limited roles instead of the postgres superuser, and turn on SSL. This will better protect customer data and reduce the risk of unauthorized access.
+
+If you want, I can also rewrite them in a more natural student style so you can paste them directly into your file.

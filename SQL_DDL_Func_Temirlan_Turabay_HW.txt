@@ -1,0 +1,227 @@
+Task 6. Analysis of existing functions in the dvd_rental / pagila database
+For this part I looked at the standard dvd_rental / pagila functions and tried to explain them using the real code logic, not just in a general way.
+
+
+1) What operations do these functions perform?
+
+1. public.film_in_stock(p_film_id integer, p_store_id integer)
+This function loops through inventory rows for the given film and store. For each matching inventory_id it calls inventory_in_stock(inventory_id). If that helper says TRUE, the function returns that inventory_id. So in practice this function returns IDs of available copies, not just some abstract stock status.
+
+2. public.film_not_in_stock(p_film_id integer, p_store_id integer)
+This is the opposite version. It looks at inventory for the given film and store and returns inventory_id values for copies that are currently not available.
+
+3. public.inventory_in_stock(p_inventory_id integer)
+This function checks rental rows for one inventory item. If there are no rentals for that inventory_id, it returns TRUE. If there is at least one rental with return_date IS NULL, it returns FALSE. Otherwise it returns TRUE. So the real decision is based on whether there is an open rental for that copy.
+
+4. public.inventory_held_by_customer(p_inventory_id integer)
+This one searches for an open rental of the given inventory item. If it finds one, it returns the customer_id from that rental. If there is no open rental, it returns NULL.
+
+5. public.get_customer_balance(p_customer_id integer, p_effective_date timestamp)
+This function tries to calculate the customer's balance as of a certain date. In the original code it adds rental charges, adds some overdue amount, and subtracts payments made up to the effective date. The main idea is clear, but the implementation does not fully match all business rules written in the function header.
+
+6. public.rewards_report(min_monthly_purchases integer, min_dollar_amount_purchased numeric)
+This function is supposed to return customers who qualify for a rewards rule. It validates the input values, builds a time window, creates a temporary table, builds a SQL string in tmpSQL, executes it, and then returns the matching customer rows.
+
+7. public.last_day(ts)
+This function returns the last day of the month for the input date. It works by moving to the next month and subtracting one day, so it also handles leap years correctly.
+
+
+2) Why does rewards_report return 0 rows? Correct and recreate it
+
+The main reason is the date window. The sample dvd_rental data is old, but rewards_report uses CURRENT_DATE. Because of that, the month it checks usually has no payments in the training database, so the function returns no rows even if the query itself is not broken.
+
+I think this function is easier to fix by removing the temporary table and removing dynamic SQL. A cleaner version can use RETURN QUERY directly and anchor the reporting period either to a parameter or to max(payment_date) from the payment table.
+
+Corrected version:
+
+CREATE OR REPLACE FUNCTION public.rewards_report(
+    min_monthly_purchases integer,
+    min_dollar_amount_purchased numeric,
+    p_reference_date date DEFAULT NULL
+)
+RETURNS SETOF public.customer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_anchor_date date;
+    v_month_start date;
+    v_month_end date;
+BEGIN
+    IF min_monthly_purchases <= 0 THEN
+        RAISE EXCEPTION 'min_monthly_purchases must be > 0';
+    END IF;
+
+    IF min_dollar_amount_purchased <= 0 THEN
+        RAISE EXCEPTION 'min_dollar_amount_purchased must be > 0';
+    END IF;
+
+    SELECT COALESCE(
+               p_reference_date,
+               (SELECT max(payment_date)::date FROM public.payment)
+           )
+      INTO v_anchor_date;
+
+    IF v_anchor_date IS NULL THEN
+        RAISE EXCEPTION 'payment table contains no data';
+    END IF;
+
+    v_month_start := date_trunc('month', v_anchor_date)::date;
+    v_month_end   := (date_trunc('month', v_anchor_date)::date + interval '1 month' - interval '1 day')::date;
+
+    RETURN QUERY
+    SELECT c.*
+    FROM public.customer c
+    JOIN (
+        SELECT p.customer_id
+        FROM public.payment p
+        WHERE p.payment_date::date BETWEEN v_month_start AND v_month_end
+        GROUP BY p.customer_id
+        HAVING COUNT(*) > min_monthly_purchases
+           AND SUM(p.amount) > min_dollar_amount_purchased
+    ) q
+      ON q.customer_id = c.customer_id
+    ORDER BY c.customer_id;
+END;
+$$;
+
+This version is simpler, easier to test, and it works with the data that actually exists in the sample database.
+
+
+3) Is there any function that can potentially be removed?
+
+The most obvious candidate is the custom group_concat aggregate together with its helper _group_concat. PostgreSQL already has string_agg, so this custom pair is mostly a compatibility workaround from older code. I would not drop it immediately, because some views still use it, but after replacing those usages with string_agg it becomes unnecessary.
+
+
+4) Which functions violate best practices?
+
+The weakest one is rewards_report. It uses dynamic SQL even though the query structure is fixed, and it also creates a temporary table when RETURN QUERY would be enough.
+
+get_customer_balance is also not ideal, mainly because the code does not fully match the business rules in its own header comment.
+
+film_in_stock and film_not_in_stock are not terrible, but their OUT parameter naming can be confusing because they return inventory IDs, not counts.
+
+inventory_in_stock is also a bit weak because an invalid inventory_id can end up looking the same as a copy that simply has no rental history.
+
+
+5) Change get_customer_balance using the requirements from the comments
+
+The original header describes a few business rules:
+1. add rental fees for previous rentals
+2. charge 1 dollar per overdue day
+3. if overdue is more than rental_duration * 2, charge replacement_cost
+4. subtract payments made before the effective date
+
+The old function does not fully cover all of that. A cleaner version would be:
+
+CREATE OR REPLACE FUNCTION public.get_customer_balance(
+    p_customer_id integer,
+    p_effective_date timestamp with time zone
+)
+RETURNS numeric
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_balance numeric := 0;
+BEGIN
+    IF p_customer_id IS NULL THEN
+        RAISE EXCEPTION 'p_customer_id must not be null';
+    END IF;
+
+    IF p_effective_date IS NULL THEN
+        RAISE EXCEPTION 'p_effective_date must not be null';
+    END IF;
+
+    SELECT COALESCE(SUM(charge_amount), 0)
+      INTO v_balance
+    FROM (
+        SELECT
+            f.rental_rate
+            + CASE
+                  WHEN calc.days_kept > f.rental_duration * 2
+                      THEN f.replacement_cost
+                  WHEN calc.days_kept > f.rental_duration
+                      THEN (calc.days_kept - f.rental_duration)
+                  ELSE 0
+              END AS charge_amount
+        FROM public.rental r
+        JOIN public.inventory i
+          ON i.inventory_id = r.inventory_id
+        JOIN public.film f
+          ON f.film_id = i.film_id
+        CROSS JOIN LATERAL (
+            SELECT GREATEST(
+                       0,
+                       CEIL(
+                           EXTRACT(EPOCH FROM (
+                               LEAST(COALESCE(r.return_date, p_effective_date), p_effective_date)
+                               - r.rental_date
+                           )) / 86400.0
+                       )
+                   )::int AS days_kept
+        ) calc
+        WHERE r.customer_id = p_customer_id
+          AND r.rental_date <= p_effective_date
+    ) s;
+
+    SELECT v_balance - COALESCE(SUM(p.amount), 0)
+      INTO v_balance
+    FROM public.payment p
+    WHERE p.customer_id = p_customer_id
+      AND p.payment_date <= p_effective_date;
+
+    RETURN COALESCE(v_balance, 0);
+END;
+$$;
+
+This version is closer to the written rules because it checks overdue time up to the effective date, also handles open rentals, and can apply replacement_cost.
+
+
+6) How do group_concat and _group_concat work? Where are they used?
+
+_group_concat is the transition function. It takes the current text value and the next text value. If the current state is NULL, it returns the new text. If the new text is NULL, it keeps the current state. Otherwise it joins them with ', '.
+
+group_concat is the aggregate built on top of that helper, so across many rows it produces one comma-separated text string.
+
+These are used in views such as actor_info and nicer_but_slower_film_list.
+
+
+7) What does last_updated do? Where is it used?
+
+last_updated is a trigger function. Its logic is very short: on update it sets NEW.last_update = CURRENT_TIMESTAMP and then returns NEW.
+
+It is used by BEFORE UPDATE triggers on tables that have a last_update column, for example actor, address, category, city, country, customer, film, film_actor, film_category, inventory, language, rental, staff, and store.
+
+
+8) What is tmpSQL in rewards_report for? Can the function be recreated without EXECUTE?
+
+tmpSQL is just a variable that stores a SQL statement as text. In the old rewards_report function that text is later executed with EXECUTE.
+
+Yes, this function can be recreated without EXECUTE. The table names, joins, and conditions are fixed, so there is no real need for dynamic SQL here. A normal RETURN QUERY version is simpler and easier to read.
+
+
+9) Can any function produce incorrect results? Why?
+
+Yes.
+
+inventory_in_stock can treat an unknown inventory_id the same way as a copy with no rentals, which is not ideal.
+
+get_customer_balance can be off because the original implementation does not fully enforce all business rules from the comment.
+
+rewards_report can give an empty result not because nobody qualifies, but because its date logic is tied to CURRENT_DATE while the training data is historical.
+
+inventory_held_by_customer can also become ambiguous if the data is inconsistent and somehow more than one open rental exists for the same inventory item.
+
+
+10) Final conclusion
+
+In my opinion the main problems are rewards_report and get_customer_balance.
+
+rewards_report is too complicated for what it does, and get_customer_balance does not fully follow its own documented rules.
+
+The stock helper functions are still useful, but some of them could be made stricter.
+
+If I had to improve the codebase step by step, I would do it in this order:
+1. rewrite rewards_report
+2. fix get_customer_balance
+3. replace group_concat with string_agg where possible
+4. make inventory_in_stock stricter for invalid IDs

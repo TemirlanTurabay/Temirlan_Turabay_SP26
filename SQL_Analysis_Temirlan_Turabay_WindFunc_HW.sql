@@ -54,10 +54,8 @@ ORDER BY
 
 /*
 Task 2:
-I use conditional aggregation with CASE instead of crosstab because it is simpler and does not require the tablefunc extension.
-Each CASE calculates sales only for one quarter.
-YEAR_SUM is calculated as the total sales for the whole year.
-I keep YEAR_SUM numeric inside the CTE, then format it only in the final SELECT, so sorting works correctly.
+I use window functions with PARTITION BY product name to calculate quarterly and yearly sales.
+The final SELECT uses DISTINCT because window functions return values for every sales row.
 */
 
 WITH product_sales AS (
@@ -67,24 +65,24 @@ WITH product_sales AS (
         SUM(CASE 
                 WHEN t.calendar_quarter_number = 1 THEN s.amount_sold 
                 ELSE 0 
-            END) AS q1,
+            END) OVER (PARTITION BY p.prod_name) AS q1,
 
         SUM(CASE 
                 WHEN t.calendar_quarter_number = 2 THEN s.amount_sold 
                 ELSE 0 
-            END) AS q2,
+            END) OVER (PARTITION BY p.prod_name) AS q2,
 
         SUM(CASE 
                 WHEN t.calendar_quarter_number = 3 THEN s.amount_sold 
                 ELSE 0 
-            END) AS q3,
+            END) OVER (PARTITION BY p.prod_name) AS q3,
 
         SUM(CASE 
                 WHEN t.calendar_quarter_number = 4 THEN s.amount_sold 
                 ELSE 0 
-            END) AS q4,
+            END) OVER (PARTITION BY p.prod_name) AS q4,
 
-        SUM(s.amount_sold) AS year_sum
+        SUM(s.amount_sold) OVER (PARTITION BY p.prod_name) AS year_sum
 
     FROM sh.sales s
     JOIN sh.products p
@@ -99,34 +97,31 @@ WITH product_sales AS (
     WHERE p.prod_category = 'Photo'
       AND co.country_region = 'Asia'
       AND t.calendar_year = 2000
-
-    GROUP BY
-        p.prod_name
 )
 
-SELECT
-    ps.product_name,
-    TO_CHAR(ps.q1, 'FM999999999990.00') AS q1,
-    TO_CHAR(ps.q2, 'FM999999999990.00') AS q2,
-    TO_CHAR(ps.q3, 'FM999999999990.00') AS q3,
-    TO_CHAR(ps.q4, 'FM999999999990.00') AS q4,
-    TO_CHAR(ps.year_sum, 'FM999999999990.00') AS year_sum
-FROM product_sales ps
+SELECT DISTINCT
+    product_name,
+    TO_CHAR(q1, 'FM999999999990.00') AS q1,
+    TO_CHAR(q2, 'FM999999999990.00') AS q2,
+    TO_CHAR(q3, 'FM999999999990.00') AS q3,
+    TO_CHAR(q4, 'FM999999999990.00') AS q4,
+    TO_CHAR(year_sum, 'FM999999999990.00') AS year_sum
+FROM product_sales
 ORDER BY
-    ps.year_sum DESC;
+    year_sum DESC;
 
 /*
-Task 3: 
-I first aggregate sales by channel and customer because one customer can have many purchases.
-I filter only the required years before aggregation, so the total sales are calculated only for 1998, 1999, and 2001.
-I use RANK() separately inside each sales channel with PARTITION BY channel_desc.
-This is needed because the task says calculations should be performed separately for each channel.
-I do not use window frames such as ROWS BETWEEN or RANGE BETWEEN, because they are not allowed.
+Task 3:
+I first aggregate sales by channel, year, and customer.
+Then I rank customers separately inside each channel and each year.
+After that I filter customers with rank <= 300.
+Finally, I keep only customers who appear in the top 300 in all three years.
 */
 
-WITH customer_channel_sales AS (
+WITH customer_year_sales AS (
     SELECT
         ch.channel_desc,
+        t.calendar_year,
         c.cust_id,
         c.cust_last_name,
         c.cust_first_name,
@@ -141,6 +136,7 @@ WITH customer_channel_sales AS (
     WHERE t.calendar_year IN (1998, 1999, 2001)
     GROUP BY
         ch.channel_desc,
+        t.calendar_year,
         c.cust_id,
         c.cust_last_name,
         c.cust_first_name
@@ -149,15 +145,35 @@ WITH customer_channel_sales AS (
 ranked_customers AS (
     SELECT
         channel_desc,
+        calendar_year,
         cust_id,
         cust_last_name,
         cust_first_name,
         amount_sold,
         RANK() OVER (
-            PARTITION BY channel_desc
-            ORDER BY amount_sold DESC
+            PARTITION BY channel_desc, calendar_year
+            ORDER BY SUM(amount_sold) DESC
         ) AS sales_rank
-    FROM customer_channel_sales
+    FROM customer_year_sales
+    GROUP BY
+        channel_desc,
+        calendar_year,
+        cust_id,
+        cust_last_name,
+        cust_first_name,
+        amount_sold
+),
+
+top_customers AS (
+    SELECT
+        channel_desc,
+        calendar_year,
+        cust_id,
+        cust_last_name,
+        cust_first_name,
+        amount_sold
+    FROM ranked_customers
+    WHERE sales_rank <= 300
 )
 
 SELECT
@@ -165,35 +181,43 @@ SELECT
     cust_id,
     cust_last_name,
     cust_first_name,
-    TO_CHAR(amount_sold, 'FM999999999990.00') AS amount_sold
-FROM ranked_customers
-WHERE sales_rank <= 300
+    TO_CHAR(SUM(amount_sold), 'FM999999999990.00') AS total_sales
+FROM top_customers
+GROUP BY
+    channel_desc,
+    cust_id,
+    cust_last_name,
+    cust_first_name
+HAVING COUNT(DISTINCT calendar_year) = 3
 ORDER BY
     channel_desc,
-    amount_sold DESC;
+    SUM(amount_sold) DESC;
 
 /*
 Task 4:
-The task asks to compare sales in Europe and Americas, so I use conditional aggregation.
-This means I create separate SUM calculations for each region using CASE.
-I do not use window functions or window frames here because this task only needs grouped totals.
-I group by month and product category because the report must show sales by month and category.
+I use window functions with PARTITION BY month and product category.
+This allows sales for Americas and Europe to be calculated without GROUP BY.
 */
 
 WITH monthly_category_sales AS (
     SELECT
+        t.calendar_month_number,
         t.calendar_month_desc,
         p.prod_category,
 
         SUM(CASE
                 WHEN co.country_region = 'Americas' THEN s.amount_sold
                 ELSE 0
-            END) AS americas_sales,
+            END) OVER (
+                PARTITION BY t.calendar_month_number, t.calendar_month_desc, p.prod_category
+            ) AS americas_sales,
 
         SUM(CASE
                 WHEN co.country_region = 'Europe' THEN s.amount_sold
                 ELSE 0
-            END) AS europe_sales
+            END) OVER (
+                PARTITION BY t.calendar_month_number, t.calendar_month_desc, p.prod_category
+            ) AS europe_sales
 
     FROM sh.sales s
     JOIN sh.times t
@@ -208,18 +232,14 @@ WITH monthly_category_sales AS (
     WHERE t.calendar_year = 2000
       AND t.calendar_month_number IN (1, 2, 3)
       AND co.country_region IN ('Europe', 'Americas')
-
-    GROUP BY
-        t.calendar_month_desc,
-        p.prod_category
 )
 
-SELECT
+SELECT DISTINCT
     calendar_month_desc,
     prod_category,
     TO_CHAR(americas_sales, 'FM999G999G999G990') AS "Americas SALES",
     TO_CHAR(europe_sales, 'FM999G999G999G990') AS "Europe SALES"
 FROM monthly_category_sales
 ORDER BY
-    calendar_month_desc,
+    calendar_month_number,
     prod_category;
